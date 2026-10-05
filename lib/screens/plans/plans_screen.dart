@@ -1,12 +1,23 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/workout_plan.dart';
 
-typedef _PlanDraft = ({String name, List<String> exercises});
+typedef _PlanDraft = ({
+  String name,
+  List<String> exercises,
+  List<String?> exerciseImages,
+});
 
 class PlansScreen extends StatelessWidget {
   final List<WorkoutPlan> plans;
-  final void Function(String name, List<String> exercises) onCreatePlan;
+  final void Function(
+    String name,
+    List<String> exercises,
+    List<String?> exerciseImages,
+  ) onCreatePlan;
   final ValueChanged<WorkoutPlan> onUpdatePlan;
   final ValueChanged<WorkoutPlan> onDeletePlan;
   final ValueChanged<WorkoutPlan> onStartWorkout;
@@ -31,6 +42,10 @@ class PlansScreen extends StatelessWidget {
         : plan.exerciseNames
             .map((exercise) => TextEditingController(text: exercise))
             .toList();
+    final exerciseImages = List<String?>.generate(
+      exerciseControllers.length,
+      (index) => plan?.exerciseImageAt(index),
+    );
 
     try {
       final result = await showDialog<_PlanDraft>(
@@ -65,35 +80,92 @@ class PlansScreen extends StatelessWidget {
                         final index = entry.$1;
                         final controller = entry.$2;
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: TextFormField(
-                                  key: ValueKey(controller),
-                                  controller: controller,
-                                  textCapitalization: TextCapitalization.words,
-                                  decoration: InputDecoration(
-                                    labelText: 'Exercise ${index + 1}',
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      key: ValueKey(controller),
+                                      controller: controller,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      decoration: InputDecoration(
+                                        labelText: 'Exercise ${index + 1}',
+                                      ),
+                                      validator: (value) =>
+                                          value == null || value.trim().isEmpty
+                                              ? 'Enter an exercise name'
+                                              : null,
+                                    ),
                                   ),
-                                  validator: (value) =>
-                                      value == null || value.trim().isEmpty
-                                          ? 'Enter an exercise name'
-                                          : null,
-                                ),
+                                  IconButton(
+                                    tooltip: 'Remove exercise',
+                                    onPressed: exerciseControllers.length == 1
+                                        ? null
+                                        : () {
+                                            setDialogState(() {
+                                              exerciseControllers
+                                                  .removeAt(index)
+                                                  .dispose();
+                                              exerciseImages.removeAt(index);
+                                            });
+                                          },
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                tooltip: 'Remove exercise',
-                                onPressed: exerciseControllers.length == 1
-                                    ? null
-                                    : () {
-                                        setDialogState(() {
-                                          exerciseControllers
-                                              .removeAt(index)
-                                              .dispose();
-                                        });
-                                      },
-                                icon: const Icon(Icons.remove_circle_outline),
+                              Row(
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final image =
+                                          await ImagePicker().pickImage(
+                                        source: ImageSource.gallery,
+                                        maxWidth: 480,
+                                        maxHeight: 480,
+                                        imageQuality: 60,
+                                      );
+                                      if (image == null) return;
+                                      final bytes = await image.readAsBytes();
+                                      if (!context.mounted) return;
+                                      setDialogState(() {
+                                        exerciseImages[index] =
+                                            base64Encode(bytes);
+                                      });
+                                    },
+                                    icon: const Icon(Icons.photo_library),
+                                    label: Text(
+                                      exerciseImages[index] == null
+                                          ? 'Choose photo'
+                                          : 'Change photo',
+                                    ),
+                                  ),
+                                  if (exerciseImages[index] != null)
+                                    IconButton(
+                                      tooltip: 'Remove photo',
+                                      onPressed: () => setDialogState(
+                                        () => exerciseImages[index] = null,
+                                      ),
+                                      icon: const Icon(Icons.delete_outline),
+                                    ),
+                                  if (exerciseImages[index] != null) ...[
+                                    const SizedBox(width: 8),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.memory(
+                                        base64Decode(exerciseImages[index]!),
+                                        width: 52,
+                                        height: 52,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ],
                           ),
@@ -102,11 +174,10 @@ class PlansScreen extends StatelessWidget {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
-                          onPressed: () => setDialogState(
-                            () => exerciseControllers.add(
-                              TextEditingController(),
-                            ),
-                          ),
+                          onPressed: () => setDialogState(() {
+                            exerciseControllers.add(TextEditingController());
+                            exerciseImages.add(null);
+                          }),
                           icon: const Icon(Icons.add),
                           label: const Text('Add exercise'),
                         ),
@@ -131,6 +202,7 @@ class PlansScreen extends StatelessWidget {
                       exercises: exerciseControllers
                           .map((controller) => controller.text.trim())
                           .toList(),
+                      exerciseImages: List.of(exerciseImages),
                     ),
                   );
                 },
@@ -142,7 +214,11 @@ class PlansScreen extends StatelessWidget {
       );
       if (result == null) return;
       if (plan == null) {
-        onCreatePlan(result.name, result.exercises);
+        onCreatePlan(
+          result.name,
+          result.exercises,
+          result.exerciseImages,
+        );
       } else {
         onUpdatePlan(
           WorkoutPlan(
@@ -150,6 +226,7 @@ class PlansScreen extends StatelessWidget {
             name: result.name,
             exerciseCount: result.exercises.length,
             exercises: result.exercises,
+            exerciseImages: result.exerciseImages,
             category: plan.category,
             lastCompleted: plan.lastCompleted,
           ),

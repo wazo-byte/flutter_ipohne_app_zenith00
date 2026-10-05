@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
@@ -84,6 +86,7 @@ class _WorkoutSessionScreenState extends State<WorkoutSessionScreen> {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) => _ExerciseLogger(
                     name: widget.plan.exerciseNames[index],
+                    imageData: widget.plan.exerciseImageAt(index),
                     sets: _sets[index],
                     onChanged: () => setState(() {}),
                   ),
@@ -119,11 +122,16 @@ class _SetInput {
 
 class _ExerciseLogger extends StatelessWidget {
   final String name;
+  final String? imageData;
   final List<_SetInput> sets;
   final VoidCallback onChanged;
 
-  const _ExerciseLogger(
-      {required this.name, required this.sets, required this.onChanged});
+  const _ExerciseLogger({
+    required this.name,
+    required this.imageData,
+    required this.sets,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) => Container(
@@ -136,6 +144,18 @@ class _ExerciseLogger extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (imageData != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.memory(
+                  base64Decode(imageData!),
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             Text(name,
                 style:
                     const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),

@@ -165,7 +165,11 @@ class _ZenithShellState extends State<ZenithShell> {
     _save();
   }
 
-  void _createPlan(String name, List<String> exercises) {
+  void _createPlan(
+    String name,
+    List<String> exercises,
+    List<String?> exerciseImages,
+  ) {
     final id = 'custom-${DateTime.now().microsecondsSinceEpoch}';
     setState(() {
       _plans.add(
@@ -174,6 +178,7 @@ class _ZenithShellState extends State<ZenithShell> {
           name: name,
           exerciseCount: exercises.length,
           exercises: exercises,
+          exerciseImages: exerciseImages,
         ),
       );
     });
