@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../models/workout_plan.dart';
@@ -30,10 +32,20 @@ class WorkoutCard extends StatelessWidget {
               color: AppTheme.surface2,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
-              child:
-                  Icon(Icons.fitness_center, size: 64, color: AppTheme.muted),
-            ),
+            clipBehavior: Clip.antiAlias,
+            child: plan.coverImageData == null
+                ? const Center(
+                    child: Icon(
+                      Icons.fitness_center,
+                      size: 64,
+                      color: AppTheme.muted,
+                    ),
+                  )
+                : Image.memory(
+                    base64Decode(plan.coverImageData!),
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
           ),
           const SizedBox(height: 14),
           Text(plan.name,

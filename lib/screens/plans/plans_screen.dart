@@ -2,22 +2,20 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+
 import '../../core/theme/app_theme.dart';
 import '../../models/workout_plan.dart';
 
 typedef _PlanDraft = ({
   String name,
   List<String> exercises,
-  List<String?> exerciseImages,
+  String? coverImageData,
 });
 
 class PlansScreen extends StatelessWidget {
   final List<WorkoutPlan> plans;
-  final void Function(
-    String name,
-    List<String> exercises,
-    List<String?> exerciseImages,
-  ) onCreatePlan;
+  final void Function(String name, List<String> exercises, String? coverImageData)
+      onCreatePlan;
   final ValueChanged<WorkoutPlan> onUpdatePlan;
   final ValueChanged<WorkoutPlan> onDeletePlan;
   final ValueChanged<WorkoutPlan> onStartWorkout;
@@ -42,10 +40,7 @@ class PlansScreen extends StatelessWidget {
         : plan.exerciseNames
             .map((exercise) => TextEditingController(text: exercise))
             .toList();
-    final exerciseImages = List<String?>.generate(
-      exerciseControllers.length,
-      (index) => plan?.exerciseImageAt(index),
-    );
+    var coverImageData = plan?.coverImageData;
 
     try {
       final result = await showDialog<_PlanDraft>(
@@ -76,6 +71,49 @@ class PlansScreen extends StatelessWidget {
                                 : null,
                       ),
                       const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final image = await ImagePicker().pickImage(
+                            source: ImageSource.gallery,
+                            maxWidth: 640,
+                            maxHeight: 360,
+                            imageQuality: 65,
+                          );
+                          if (image == null) return;
+                          final bytes = await image.readAsBytes();
+                          if (!context.mounted) return;
+                          setDialogState(
+                              () => coverImageData = base64Encode(bytes));
+                        },
+                        icon: const Icon(Icons.photo_library),
+                        label: Text(
+                          coverImageData == null
+                              ? 'Choose plan picture'
+                              : 'Change plan picture',
+                        ),
+                      ),
+                      if (coverImageData != null) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.memory(
+                            base64Decode(coverImageData!),
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () =>
+                                setDialogState(() => coverImageData = null),
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Remove picture'),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
                       ...exerciseControllers.indexed.map((entry) {
                         final index = entry.$1;
                         final controller = entry.$2;
@@ -110,61 +148,12 @@ class PlansScreen extends StatelessWidget {
                                               exerciseControllers
                                                   .removeAt(index)
                                                   .dispose();
-                                              exerciseImages.removeAt(index);
                                             });
                                           },
                                     icon: const Icon(
                                       Icons.remove_circle_outline,
                                     ),
                                   ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final image =
-                                          await ImagePicker().pickImage(
-                                        source: ImageSource.gallery,
-                                        maxWidth: 480,
-                                        maxHeight: 480,
-                                        imageQuality: 60,
-                                      );
-                                      if (image == null) return;
-                                      final bytes = await image.readAsBytes();
-                                      if (!context.mounted) return;
-                                      setDialogState(() {
-                                        exerciseImages[index] =
-                                            base64Encode(bytes);
-                                      });
-                                    },
-                                    icon: const Icon(Icons.photo_library),
-                                    label: Text(
-                                      exerciseImages[index] == null
-                                          ? 'Choose photo'
-                                          : 'Change photo',
-                                    ),
-                                  ),
-                                  if (exerciseImages[index] != null)
-                                    IconButton(
-                                      tooltip: 'Remove photo',
-                                      onPressed: () => setDialogState(
-                                        () => exerciseImages[index] = null,
-                                      ),
-                                      icon: const Icon(Icons.delete_outline),
-                                    ),
-                                  if (exerciseImages[index] != null) ...[
-                                    const SizedBox(width: 8),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.memory(
-                                        base64Decode(exerciseImages[index]!),
-                                        width: 52,
-                                        height: 52,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    ),
-                                  ],
                                 ],
                               ),
                             ],
@@ -176,7 +165,6 @@ class PlansScreen extends StatelessWidget {
                         child: TextButton.icon(
                           onPressed: () => setDialogState(() {
                             exerciseControllers.add(TextEditingController());
-                            exerciseImages.add(null);
                           }),
                           icon: const Icon(Icons.add),
                           label: const Text('Add exercise'),
@@ -202,7 +190,7 @@ class PlansScreen extends StatelessWidget {
                       exercises: exerciseControllers
                           .map((controller) => controller.text.trim())
                           .toList(),
-                      exerciseImages: List.of(exerciseImages),
+                      coverImageData: coverImageData,
                     ),
                   );
                 },
@@ -217,7 +205,7 @@ class PlansScreen extends StatelessWidget {
         onCreatePlan(
           result.name,
           result.exercises,
-          result.exerciseImages,
+          result.coverImageData,
         );
       } else {
         onUpdatePlan(
@@ -226,7 +214,7 @@ class PlansScreen extends StatelessWidget {
             name: result.name,
             exerciseCount: result.exercises.length,
             exercises: result.exercises,
-            exerciseImages: result.exerciseImages,
+            coverImageData: result.coverImageData,
             category: plan.category,
             lastCompleted: plan.lastCompleted,
           ),
