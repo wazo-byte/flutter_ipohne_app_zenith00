@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/workout_plan.dart';
 
+typedef _PlanDraft = ({String name, List<String> exercises});
+
 class PlansScreen extends StatelessWidget {
   final List<WorkoutPlan> plans;
-  final void Function(String name, int exerciseCount) onCreatePlan;
+  final void Function(String name, List<String> exercises) onCreatePlan;
+  final ValueChanged<WorkoutPlan> onUpdatePlan;
   final ValueChanged<WorkoutPlan> onDeletePlan;
   final ValueChanged<WorkoutPlan> onStartWorkout;
 
@@ -12,74 +15,152 @@ class PlansScreen extends StatelessWidget {
     super.key,
     required this.plans,
     required this.onCreatePlan,
+    required this.onUpdatePlan,
     required this.onDeletePlan,
     required this.onStartWorkout,
   });
 
-  Future<void> _showCreatePlanDialog(BuildContext context) async {
+  Future<void> _showPlanDialog(
+    BuildContext context, {
+    WorkoutPlan? plan,
+  }) async {
     final formKey = GlobalKey<FormState>();
-    var exerciseCount = 5;
-    var planName = '';
+    final nameController = TextEditingController(text: plan?.name ?? '');
+    final exerciseControllers = plan == null
+        ? List.generate(5, (_) => TextEditingController())
+        : plan.exerciseNames
+            .map((exercise) => TextEditingController(text: exercise))
+            .toList();
 
-    final result = await showDialog<(String, int)>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Create a plan'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  autofocus: true,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(labelText: 'Plan name'),
-                  onSaved: (value) => planName = value?.trim() ?? '',
-                  validator: (value) => value == null || value.trim().isEmpty
-                      ? 'Enter a plan name'
-                      : null,
+    try {
+      final result = await showDialog<_PlanDraft>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(plan == null ? 'Create a plan' : 'Edit plan'),
+            content: SizedBox(
+              width: 420,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * 0.65,
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  initialValue: exerciseCount,
-                  decoration: const InputDecoration(labelText: 'Exercises'),
-                  items: List.generate(8, (index) => index + 1)
-                      .map(
-                        (count) => DropdownMenuItem(
-                          value: count,
-                          child: Text('$count exercises'),
+                child: Form(
+                  key: formKey,
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        autofocus: plan == null,
+                        textCapitalization: TextCapitalization.words,
+                        decoration:
+                            const InputDecoration(labelText: 'Plan name'),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Enter a plan name'
+                                : null,
+                      ),
+                      const SizedBox(height: 16),
+                      ...exerciseControllers.indexed.map((entry) {
+                        final index = entry.$1;
+                        final controller = entry.$2;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  key: ValueKey(controller),
+                                  controller: controller,
+                                  textCapitalization: TextCapitalization.words,
+                                  decoration: InputDecoration(
+                                    labelText: 'Exercise ${index + 1}',
+                                  ),
+                                  validator: (value) =>
+                                      value == null || value.trim().isEmpty
+                                          ? 'Enter an exercise name'
+                                          : null,
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Remove exercise',
+                                onPressed: exerciseControllers.length == 1
+                                    ? null
+                                    : () {
+                                        setDialogState(() {
+                                          exerciseControllers
+                                              .removeAt(index)
+                                              .dispose();
+                                        });
+                                      },
+                                icon: const Icon(Icons.remove_circle_outline),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => setDialogState(
+                            () => exerciseControllers.add(
+                              TextEditingController(),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add exercise'),
                         ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => exerciseCount = value);
-                    }
-                  },
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (!formKey.currentState!.validate()) return;
+                  Navigator.pop(
+                    context,
+                    (
+                      name: nameController.text.trim(),
+                      exercises: exerciseControllers
+                          .map((controller) => controller.text.trim())
+                          .toList(),
+                    ),
+                  );
+                },
+                child: Text(plan == null ? 'Create' : 'Save'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  formKey.currentState!.save();
-                  Navigator.pop(context, (planName, exerciseCount));
-                }
-              },
-              child: const Text('Create'),
-            ),
-          ],
         ),
-      ),
-    );
-    if (result != null) onCreatePlan(result.$1, result.$2);
+      );
+      if (result == null) return;
+      if (plan == null) {
+        onCreatePlan(result.name, result.exercises);
+      } else {
+        onUpdatePlan(
+          WorkoutPlan(
+            id: plan.id,
+            name: result.name,
+            exerciseCount: result.exercises.length,
+            exercises: result.exercises,
+            category: plan.category,
+            lastCompleted: plan.lastCompleted,
+          ),
+        );
+      }
+    } finally {
+      nameController.dispose();
+      for (final controller in exerciseControllers) {
+        controller.dispose();
+      }
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, WorkoutPlan plan) async {
@@ -118,7 +199,7 @@ class PlansScreen extends StatelessWidget {
               ),
               IconButton.filled(
                 tooltip: 'Create plan',
-                onPressed: () => _showCreatePlanDialog(context),
+                onPressed: () => _showPlanDialog(context),
                 icon: const Icon(Icons.add),
               ),
             ],
@@ -154,21 +235,27 @@ class PlansScreen extends StatelessWidget {
                       title: Text(plan.name,
                           style: const TextStyle(fontWeight: FontWeight.w700)),
                       subtitle: Text('${plan.exerciseCount} exercises'),
-                      trailing: plans.length > 1
-                          ? PopupMenuButton<String>(
-                              tooltip: 'Plan options',
-                              onSelected: (value) {
-                                if (value == 'delete') {
-                                  _confirmDelete(context, plan);
-                                }
-                              },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Delete plan')),
-                              ],
-                            )
-                          : null,
+                      trailing: PopupMenuButton<String>(
+                        tooltip: 'Plan options',
+                        onSelected: (value) {
+                          if (value == 'edit') {
+                            _showPlanDialog(context, plan: plan);
+                          } else if (value == 'delete') {
+                            _confirmDelete(context, plan);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit plan'),
+                          ),
+                          if (plans.length > 1)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete plan'),
+                            ),
+                        ],
+                      ),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
@@ -187,7 +274,7 @@ class PlansScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () => _showCreatePlanDialog(context),
+            onPressed: () => _showPlanDialog(context),
             icon: const Icon(Icons.add),
             label: const Text('Create New Plan'),
           ),

@@ -165,16 +165,25 @@ class _ZenithShellState extends State<ZenithShell> {
     _save();
   }
 
-  void _createPlan(String name, int exerciseCount) {
+  void _createPlan(String name, List<String> exercises) {
     final id = 'custom-${DateTime.now().microsecondsSinceEpoch}';
     setState(() {
       _plans.add(
         WorkoutPlan(
           id: id,
           name: name,
-          exerciseCount: exerciseCount,
+          exerciseCount: exercises.length,
+          exercises: exercises,
         ),
       );
+    });
+    _save();
+  }
+
+  void _updatePlan(WorkoutPlan plan) {
+    setState(() {
+      final index = _plans.indexWhere((item) => item.id == plan.id);
+      if (index != -1) _plans[index] = plan;
     });
     _save();
   }
@@ -198,6 +207,7 @@ class _ZenithShellState extends State<ZenithShell> {
       PlansScreen(
         plans: _plans,
         onCreatePlan: _createPlan,
+        onUpdatePlan: _updatePlan,
         onDeletePlan: _deletePlan,
         onStartWorkout: _startWorkout,
       ),
