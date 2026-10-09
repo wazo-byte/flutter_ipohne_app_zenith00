@@ -39,4 +39,32 @@ class WorkoutEngine {
     return bests.values.toList()
       ..sort((a, b) => b.set.load.compareTo(a.set.load));
   }
+  
+  /// Finds the most recent non-empty performance log for an exercise.
+  static ExerciseLog? latestExercisePerformance({
+    required List<WorkoutRecord> history,
+    required String exerciseName,
+  }) {
+    String normalize(String value) => value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ');
+
+    final target = normalize(exerciseName);
+
+    final records = history.toList()
+      ..sort((a, b) => b.completedAt.compareTo(a.completedAt));
+
+    for (final record in records) {
+      for (final exercise in record.exercises) {
+        if (normalize(exercise.exerciseName) == target &&
+            exercise.sets.isNotEmpty) {
+          return exercise;
+        }
+      }
+    }
+
+    return null;
+  }
+
 }
