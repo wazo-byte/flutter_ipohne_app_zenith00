@@ -152,18 +152,26 @@ class _ZenithShellState extends State<ZenithShell> {
               ),
       );
 
+  
   Future<void> _startWorkout(WorkoutPlan plan) async {
     final record = await Navigator.of(context).push<WorkoutRecord>(
       MaterialPageRoute(
-        builder: (_) => WorkoutSessionScreen(plan: plan),
+        builder: (_) => WorkoutSessionScreen(
+          plan: plan,
+          history: _history,
+        ),
       ),
     );
+  
     if (!mounted || record == null) return;
+  
     setState(() {
       _history.insert(0, record);
     });
-    _save();
+  
+    await _save();
   }
+
 
   void _createPlan(
     String name,
