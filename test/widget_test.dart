@@ -30,7 +30,7 @@ void main() {
 
     await tester.tap(find.text('START WORKOUT  →'));
     await tester.pumpAndSettle();
-    expect(find.text('Bench press'), findsOneWidget);
+    expect(find.text('Hip Thrust'), findsOneWidget);
 
     await tester.tap(find.text('Add set').first);
     await tester.pump();
